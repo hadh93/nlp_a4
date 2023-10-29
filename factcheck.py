@@ -81,23 +81,22 @@ class AlwaysEntailedFactChecker(object):
 class WordRecallThresholdFactChecker(object):
 
     def predict(self, fact: str, passages: List[dict]) -> str:
+        stopwords = [".", "a", "the", "an", "``", ",", "(", ")", "''", "/s", "s", ";", ">", "<", "!"]
         fact_bow = nltk.word_tokenize(fact)
-        fact_bow = set(nltk.trigrams([word.lower() for word in fact_bow]))
+        fact_bow = set(nltk.bigrams([word.lower() for word in fact_bow if word.lower not in stopwords]))
         pass_bow = set()
         for p in passages:
             pass_temp = nltk.word_tokenize(p['text'])
-            pass_temp = set(nltk.trigrams([word.lower() for word in pass_temp]))
+            pass_temp = set(nltk.bigrams([word.lower() for word in pass_temp if word.lower not in stopwords]))
             pass_bow = pass_bow.union(pass_temp)
-        exclude_words = {".", "a", "the", "an", "``", ",", "(", ")", "''", "/s", "s", ";", ">", "<", "!"}
-        fact_bow = fact_bow.difference(exclude_words)
-        pass_bow = pass_bow.difference(exclude_words)
+
         intersection = len(fact_bow.intersection(pass_bow))
         union = len(fact_bow) + len(pass_bow) - intersection
         jaccard_similarity = intersection / union
         # print(f"fact_bow: {fact_bow}")
         # print(f"pass_bow: {pass_bow}")
         print(f"jaccard similarity: {jaccard_similarity}")
-        if jaccard_similarity > 0:
+        if jaccard_similarity > 0.00305:
             return "S"
         else:
             return "NS"
