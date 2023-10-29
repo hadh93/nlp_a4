@@ -112,8 +112,8 @@ class WordRecallThresholdFactChecker(object):
         if len(fact_bow) <= 1:
             for word in fact_words:
                 if word in pass_words:
-                    print(f"Manually guessed for fact {original_fact}")
-                    return "S", 1.0
+                    # print(f"Manually guessed for fact {original_fact}")
+                    return "S"
 
         intersection = len(fact_bow.intersection(pass_bow))
         if len(fact_bow) == 0:
@@ -121,14 +121,14 @@ class WordRecallThresholdFactChecker(object):
         else:
             modified_jac = intersection / len(fact_bow)
 
-        print(f"title: {title}, fact: {original_fact}")
-        print(f"fact_bow: {fact_bow}")
-        print(f"pass_bow: {pass_bow}")
-        print(f"jaccard similarity: {modified_jac}\n")
+        # print(f"title: {title}, fact: {original_fact}")
+        # print(f"fact_bow: {fact_bow}")
+        # print(f"pass_bow: {pass_bow}")
+        # print(f"jaccard similarity: {modified_jac}\n")
         if modified_jac > 0.33:
-            return "S", modified_jac
+            return "S"
         else:
-            return "NS", modified_jac
+            return "NS"
 
 
 class EntailmentFactChecker(object):

@@ -79,11 +79,11 @@ def predict_two_classes(examples: List[FactExample], fact_checker):
     for i, example in enumerate(tqdm(examples)):
         converted_label = "NS" if example.label == 'IR' else example.label
         gold_label = gold_label_indexer.index(converted_label)
-        print(converted_label)
-        raw_pred, _ = fact_checker.predict(example.fact, example.passages)
+        # print(converted_label)
+        raw_pred = fact_checker.predict(example.fact, example.passages)
         pred_label = gold_label_indexer.index(raw_pred)
-        if converted_label != raw_pred:
-             print("Wrong!")
+        # if converted_label != raw_pred:
+        #      print("Wrong!")
         #     print("score:",_, "correct label: ", converted_label)
         #     print(example.fact, example.passages)
 
