@@ -17,6 +17,7 @@ class FactExample:
     label for prediction, so your model should just predict S or NS, but we leave it here so you can look at the
     raw data.
     """
+
     def __init__(self, fact: str, passages: List[dict], label: str):
         self.fact = fact
         self.passages = passages
@@ -81,24 +82,53 @@ class AlwaysEntailedFactChecker(object):
 class WordRecallThresholdFactChecker(object):
 
     def predict(self, fact: str, passages: List[dict]) -> str:
-        stopwords = [".", "a", "the", "an", "``", ",", "(", ")", "''", "/s", "s", ";", ">", "<", "!"]
+
+        stopwords = [".", "``", ",", "(", ")", "''", "/s", "s", ";", ">", "<", "!", "[", "]", "-", "is", "in", "have", "has", "then", "into", "he", "they", "was", "a", "the", "an", "to", "on", "as", "with", "by","for","of","from","at","about"]
+        original_fact = fact
+        fact = fact.replace("-", " ")
+        stopwords.extend([word.lower() for word in nltk.word_tokenize(passages[0]['title'])])
+
         fact_bow = nltk.word_tokenize(fact)
-        fact_bow = set(nltk.bigrams([word.lower() for word in fact_bow if word.lower not in stopwords]))
-        pass_bow = set()
+        fact_words = [word.lower() for word in fact_bow if
+                                     (word.lower() not in stopwords) and (
+                                         word.lower().isascii())]
+        fact_bow = set(nltk.bigrams(fact_words))
+
+
+        whole_p = ""
+        title = passages[0]['title']
         for p in passages:
-            pass_temp = nltk.word_tokenize(p['text'])
-            pass_temp = set(nltk.bigrams([word.lower() for word in pass_temp if word.lower not in stopwords]))
-            pass_bow = pass_bow.union(pass_temp)
+            temp = p['text']
+            temp = temp.replace("-", " ")
+            whole_p += temp
+        whole_p.replace(passages[0]['title'], "")
+        pass_bow = nltk.word_tokenize(whole_p)
+        pass_words = [word.lower() for word in pass_bow if
+                                      (word.lower() not in stopwords) and (
+                                          word.lower().isascii()) and word not in title]
+        pass_bow = set(nltk.bigrams(pass_words))
+        pass_bow = set(pass_bow)
+
+        if len(fact_bow) <= 1:
+            for word in fact_words:
+                if word in pass_words:
+                    print(f"Manually guessed for fact {original_fact}")
+                    return "S", 1.0
 
         intersection = len(fact_bow.intersection(pass_bow))
-        modified_jac = intersection / len(fact_bow)
-        # print(f"fact_bow: {fact_bow}")
-        # print(f"pass_bow: {pass_bow}")
-        print(f"jaccard similarity: {modified_jac}")
-        if modified_jac > 0.28:
-            return "S"
+        if len(fact_bow) == 0:
+            modified_jac = 0
         else:
-            return "NS"
+            modified_jac = intersection / len(fact_bow)
+
+        print(f"title: {title}, fact: {original_fact}")
+        print(f"fact_bow: {fact_bow}")
+        print(f"pass_bow: {pass_bow}")
+        print(f"jaccard similarity: {modified_jac}\n")
+        if modified_jac > 0.33:
+            return "S", modified_jac
+        else:
+            return "NS", modified_jac
 
 
 class EntailmentFactChecker(object):
@@ -139,4 +169,3 @@ class DependencyRecallThresholdFactChecker(object):
             relation = (head, token.dep_, dependent)
             relations.add(relation)
         return relations
-
