@@ -91,12 +91,11 @@ class WordRecallThresholdFactChecker(object):
             pass_bow = pass_bow.union(pass_temp)
 
         intersection = len(fact_bow.intersection(pass_bow))
-        union = len(fact_bow) + len(pass_bow) - intersection
-        jaccard_similarity = intersection / union
+        modified_jac = intersection / len(fact_bow)
         # print(f"fact_bow: {fact_bow}")
         # print(f"pass_bow: {pass_bow}")
-        print(f"jaccard similarity: {jaccard_similarity}")
-        if jaccard_similarity > 0.00305:
+        print(f"jaccard similarity: {modified_jac}")
+        if modified_jac > 0.28:
             return "S"
         else:
             return "NS"
