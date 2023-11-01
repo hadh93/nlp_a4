@@ -150,14 +150,13 @@ class WordRecallThresholdFactChecker(object):
         fact_words = [word.lower() for word in fact_bow if
                       (word.lower() not in stopwords) and (
                           word.lower().isascii())]
-        fact_bow = set(nltk.bigrams(fact_words))
+        fact_bow = set(fact_words)
 
         pass_bow = nltk.word_tokenize(sentence)
         pass_words = [word.lower() for word in pass_bow if
                       (word.lower() not in stopwords) and (
                           word.lower().isascii())]
-        pass_bow = set(nltk.bigrams(pass_words))
-        pass_bow = set(pass_bow)
+        pass_bow = set(pass_words)
 
         if len(fact_bow) <= 1:
             for word in fact_words:
@@ -169,13 +168,13 @@ class WordRecallThresholdFactChecker(object):
         if len(fact_bow) == 0:
             modified_jac = 0
         else:
-            modified_jac = intersection / len(fact_bow)
+            modified_jac = intersection
 
         # print(f"title: {title}, fact: {original_fact}")
         # print(f"fact_bow: {fact_bow}")
         # print(f"pass_bow: {pass_bow}")
         # print(f"jaccard similarity: {modified_jac}\n")
-        if modified_jac > threshold:
+        if modified_jac > 0:
             return "S"
         else:
             return "NS"
@@ -192,6 +191,9 @@ class EntailmentFactChecker(object):
             whole_p += p['text']
         whole_p = whole_p.replace("<s>", "")
         whole_p = whole_p.replace("</s>", "")
+        title = passages[0]['title']
+        fact = fact.replace(title, "")
+        whole_p = whole_p.replace(title, "")
 
         sentences = nltk.sent_tokenize(whole_p)
         chosen_sentences = []
@@ -211,8 +213,8 @@ class EntailmentFactChecker(object):
             return "NS"
 
         choice = np.argsort(np.mean(np.vstack(probs), axis=0))[-1]
-        if choice == 1:
-            choice = np.argsort(np.mean(np.vstack(probs), axis=0))[-2]
+        # if choice == 1:
+        #     choice = np.argsort(np.mean(np.vstack(probs), axis=0))[-2]
 
         if choice == 0:
             return "S"

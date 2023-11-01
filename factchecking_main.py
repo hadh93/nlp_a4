@@ -75,6 +75,8 @@ def predict_two_classes(examples: List[FactExample], fact_checker):
     gold_label_indexer = ["S", "NS"]
     confusion_mat = [[0, 0], [0, 0]]
     ex_count = 0
+    import pandas as pd
+    data = {"correct_label":[], "fact":[], "passage":[]}
 
     for i, example in enumerate(tqdm(examples)):
         converted_label = "NS" if example.label == 'IR' else example.label
@@ -83,13 +85,16 @@ def predict_two_classes(examples: List[FactExample], fact_checker):
         raw_pred = fact_checker.predict(example.fact, example.passages)
         pred_label = gold_label_indexer.index(raw_pred)
         if converted_label != raw_pred:
-              print("Wrong!")
-              print("correct label: ", converted_label)
-              print(example.fact, example.passages)
+            data['correct_label'].append(converted_label)
+            data['fact'].append(example.fact)
+            data['passage'].append(example.passages)
+
 
         confusion_mat[gold_label][pred_label] += 1
         ex_count += 1
     print_eval_stats(confusion_mat, gold_label_indexer)
+    df=pd.DataFrame(data)
+    df.to_csv('wrong.csv', index=False)
 
 
 def print_eval_stats(confusion_mat, gold_label_indexer):
