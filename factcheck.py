@@ -31,6 +31,9 @@ class EntailmentModel:
     def __init__(self, model, tokenizer):
         self.model = model
         self.tokenizer = tokenizer
+        device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        print(device)
+        model.to(device)
 
     def check_entailment(self, premise: str, hypothesis: str):
         with torch.no_grad():
@@ -43,14 +46,17 @@ class EntailmentModel:
         # Note that the labels are ["entailment", "neutral", "contradiction"]. There are a number of ways to map
         # these logits or probabilities to classification decisions; you'll have to decide how you want to do this.
 
-        raise Exception("Not implemented")
+        # raise Exception("Not implemented")
+        labels = ["entailment", "neutral", "contradiction"]
+        probs = torch.nn.functional.softmax(logits)
+        choice = int(np.argmax(probs))
 
         # To prevent out-of-memory (OOM) issues during autograding, we explicitly delete
         # objects inputs, outputs, logits, and any results that are no longer needed after the computation.
         del inputs, outputs, logits
         gc.collect()
 
-        # return something
+        return labels[choice], probs
 
 
 class FactChecker(object):
@@ -83,17 +89,18 @@ class WordRecallThresholdFactChecker(object):
 
     def predict(self, fact: str, passages: List[dict]) -> str:
 
-        stopwords = [".", "``", ",", "(", ")", "''", "/s", "s", ";", ">", "<", "!", "[", "]", "-", "is", "in", "have", "has", "then", "into", "he", "they", "was", "a", "the", "an", "to", "on", "as", "with", "by","for","of","from","at","about"]
+        stopwords = [".", "``", ",", "(", ")", "''", "/s", "s", ";", ">", "<", "!", "[", "]", "-", "is", "in", "have",
+                     "has", "then", "into", "he", "they", "was", "a", "the", "an", "to", "on", "as", "with", "by",
+                     "for", "of", "from", "at", "about"]
         original_fact = fact
         fact = fact.replace("-", " ")
         stopwords.extend([word.lower() for word in nltk.word_tokenize(passages[0]['title'])])
 
         fact_bow = nltk.word_tokenize(fact)
         fact_words = [word.lower() for word in fact_bow if
-                                     (word.lower() not in stopwords) and (
-                                         word.lower().isascii())]
+                      (word.lower() not in stopwords) and (
+                          word.lower().isascii())]
         fact_bow = set(nltk.bigrams(fact_words))
-
 
         whole_p = ""
         title = passages[0]['title']
@@ -104,8 +111,8 @@ class WordRecallThresholdFactChecker(object):
         whole_p.replace(passages[0]['title'], "")
         pass_bow = nltk.word_tokenize(whole_p)
         pass_words = [word.lower() for word in pass_bow if
-                                      (word.lower() not in stopwords) and (
-                                          word.lower().isascii()) and word not in title]
+                      (word.lower() not in stopwords) and (
+                          word.lower().isascii()) and word not in title]
         pass_bow = set(nltk.bigrams(pass_words))
         pass_bow = set(pass_bow)
 
@@ -130,13 +137,87 @@ class WordRecallThresholdFactChecker(object):
         else:
             return "NS"
 
+    def predict_sentence(self, fact: str, sentence: str, threshold: float) -> str:
+
+        stopwords = [".", "``", ",", "(", ")", "''", "/s", "s", ";", ">", "<", "!", "[", "]", "-", "is", "in", "have",
+                     "has", "then", "into", "he", "they", "was", "a", "the", "an", "to", "on", "as", "with", "by",
+                     "for", "of", "from", "at", "about"]
+        original_fact = fact
+        fact = fact.replace("-", " ")
+        # stopwords.extend([word.lower() for word in nltk.word_tokenize(passages[0]['title'])])
+
+        fact_bow = nltk.word_tokenize(fact)
+        fact_words = [word.lower() for word in fact_bow if
+                      (word.lower() not in stopwords) and (
+                          word.lower().isascii())]
+        fact_bow = set(nltk.bigrams(fact_words))
+
+        pass_bow = nltk.word_tokenize(sentence)
+        pass_words = [word.lower() for word in pass_bow if
+                      (word.lower() not in stopwords) and (
+                          word.lower().isascii())]
+        pass_bow = set(nltk.bigrams(pass_words))
+        pass_bow = set(pass_bow)
+
+        if len(fact_bow) <= 1:
+            for word in fact_words:
+                if word in pass_words:
+                    # print(f"Manually guessed for fact {original_fact}")
+                    return "S"
+
+        intersection = len(fact_bow.intersection(pass_bow))
+        if len(fact_bow) == 0:
+            modified_jac = 0
+        else:
+            modified_jac = intersection / len(fact_bow)
+
+        # print(f"title: {title}, fact: {original_fact}")
+        # print(f"fact_bow: {fact_bow}")
+        # print(f"pass_bow: {pass_bow}")
+        # print(f"jaccard similarity: {modified_jac}\n")
+        if modified_jac > threshold:
+            return "S"
+        else:
+            return "NS"
+
 
 class EntailmentFactChecker(object):
     def __init__(self, ent_model):
         self.ent_model = ent_model
+        self.prev_model = WordRecallThresholdFactChecker()
 
     def predict(self, fact: str, passages: List[dict]) -> str:
-        raise Exception("Implement me")
+        whole_p = ""
+        for p in passages:
+            whole_p += p['text']
+        whole_p = whole_p.replace("<s>", "")
+        whole_p = whole_p.replace("</s>", "")
+
+        sentences = nltk.sent_tokenize(whole_p)
+        chosen_sentences = []
+
+        for sentence in sentences:
+            if self.prev_model.predict_sentence(fact, sentence, 0) == "NS":
+                continue
+            chosen_sentences.append(sentence)
+        probs = []
+        for sentence in chosen_sentences:
+            label, prob = self.ent_model.check_entailment(sentence, fact)
+            if label == "entailment":
+                return "S"
+            probs.append(prob)
+
+        if len(probs) == 0:
+            return "NS"
+
+        choice = np.argsort(np.mean(np.vstack(probs), axis=0))[-1]
+        if choice == 1:
+            choice = np.argsort(np.mean(np.vstack(probs), axis=0))[-2]
+
+        if choice == 0:
+            return "S"
+        else:
+            return "NS"
 
 
 # OPTIONAL
